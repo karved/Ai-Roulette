@@ -3,6 +3,7 @@ import { useAuth } from './../contexts/AuthContext'
 import { useGame } from '../contexts/GameContext'
 import ProperRouletteTable from './ProperRouletteTable'
 import ImprovedBettingChips from './ImprovedBettingChips'
+import CompoundBetting from './CompoundBetting'
 import CompactGameStats from './CompactGameStats'
 import EarningsStatsPanel from './EarningsStatsPanel'
 import IntegratedAssistant from './IntegratedAssistant'
@@ -173,9 +174,10 @@ export default function GameLobby() {
             <div className="bg-[#0a5c36] rounded-xl p-2 border border-white/10 relative">
               <ProperRouletteTable />
               
-              {/* Betting Chips */}
-              <div className="mt-2">
+              {/* Betting Controls */}
+              <div className="mt-2 space-y-3">
                 <ImprovedBettingChips />
+                <CompoundBetting />
               </div>
               
               {/* Total Pot Display - Positioned relative to game area */}

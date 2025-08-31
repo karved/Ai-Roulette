@@ -21,6 +21,22 @@ export default function ProperRouletteTable() {
     game.placeBet(betType, numbers)
   }
 
+  const handleNumberClick = (number: number) => {
+    if (game.phase !== 'betting') return
+    
+    // If compound betting is active, handle number selection for compound bets
+    if (game.compoundBetting.isActive && game.compoundBetting.onNumberSelect) {
+      game.compoundBetting.onNumberSelect(number)
+    } else {
+      // Regular straight bet
+      handleBetClick('straight', [number])
+    }
+  }
+
+  const isNumberSelected = (number: number) => {
+    return game.compoundBetting.isActive && game.compoundBetting.selectedNumbers.includes(number)
+  }
+
   const getBetChips = (betType: string, numbers: number[]) => {
     return game.activeBets.filter(bet => {
       if (bet.betType !== betType) return false
@@ -41,9 +57,9 @@ export default function ProperRouletteTable() {
             {/* Zero */}
             <div className="relative flex-shrink-0">
               <button
-                onClick={() => handleBetClick('straight', [0])}
+                onClick={() => handleNumberClick(0)}
                 disabled={game.phase !== 'betting'}
-                className={`relative w-7 h-20 rounded flex items-center justify-center text-xs font-bold text-white cursor-pointer transition-all hover:scale-105 ${getNumberColor(0)}`}
+                className={`relative w-7 h-20 rounded flex items-center justify-center text-xs font-bold text-white cursor-pointer transition-all hover:scale-105 ${getNumberColor(0)} ${isNumberSelected(0) ? 'ring-2 ring-roulette-gold' : ''}`}
               >
                 0
                 {getBetChips('straight', [0]).map((bet, index) => (
@@ -70,9 +86,9 @@ export default function ProperRouletteTable() {
                   {row.map((number) => (
                     <button
                       key={number}
-                      onClick={() => handleBetClick('straight', [number])}
+                      onClick={() => handleNumberClick(number)}
                       disabled={game.phase !== 'betting'}
-                      className={`relative w-7 h-7 rounded flex items-center justify-center text-xs font-bold text-white cursor-pointer transition-all hover:scale-105 ${getNumberColor(number)}`}
+                      className={`relative w-7 h-7 rounded flex items-center justify-center text-xs font-bold text-white cursor-pointer transition-all hover:scale-105 ${getNumberColor(number)} ${isNumberSelected(number) ? 'ring-2 ring-roulette-gold' : ''}`}
                     >
                       {number}
                       {getBetChips('straight', [number]).map((bet, index) => (

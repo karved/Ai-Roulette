@@ -49,6 +49,12 @@ interface GameState {
   playerStats: PlayerStats
   pendingResult: SpinResult | null
   isGameRunning: boolean
+  compoundBetting: {
+    isActive: boolean
+    type: 'split' | 'street' | 'corner' | 'line' | null
+    selectedNumbers: number[]
+    onNumberSelect?: (number: number) => void
+  }
 }
 
 // Zustand store
@@ -61,6 +67,9 @@ interface GameStore extends GameState {
   completeSpinResult: () => void
   updateGameState: (newState: Partial<GameState>) => void
   setPlayer: (player: Player) => void
+  setCompoundBettingMode: (type: 'split' | 'street' | 'corner' | 'line' | null) => void
+  selectCompoundNumber: (number: number) => void
+  clearCompoundSelection: () => void
 }
 
 const useGameStore = create<GameStore>((set, get) => ({
@@ -92,6 +101,11 @@ const useGameStore = create<GameStore>((set, get) => ({
   },
   pendingResult: null,
   isGameRunning: false,
+  compoundBetting: {
+    isActive: false,
+    type: null,
+    selectedNumbers: []
+  },
 
   // Actions
   setSelectedChip: (amount: number) => set({ selectedChip: amount }),
@@ -209,7 +223,56 @@ const useGameStore = create<GameStore>((set, get) => ({
     }, 5000)
   },
 
-  updateGameState: (newState: Partial<GameState>) => set(newState)
+  updateGameState: (newState: Partial<GameState>) => set(newState),
+
+  setCompoundBettingMode: (type: 'split' | 'street' | 'corner' | 'line' | null) => set(() => ({
+    compoundBetting: {
+      isActive: type !== null,
+      type,
+      selectedNumbers: [],
+      onNumberSelect: type ? (number: number) => {
+        const store = get()
+        store.selectCompoundNumber(number)
+      } : undefined
+    }
+  })),
+
+  selectCompoundNumber: (number: number) => set(state => {
+    if (!state.compoundBetting.isActive || !state.compoundBetting.type) return state
+
+    const { type, selectedNumbers } = state.compoundBetting
+    const maxNumbers = type === 'split' ? 2 : type === 'street' ? 3 : type === 'corner' ? 4 : 6
+    
+    const isSelected = selectedNumbers.includes(number)
+    let newSelectedNumbers: number[]
+
+    if (isSelected) {
+      // Remove number
+      newSelectedNumbers = selectedNumbers.filter(n => n !== number)
+    } else {
+      // Add number (with limits based on bet type)
+      if (selectedNumbers.length >= maxNumbers) {
+        // Replace the oldest selection
+        newSelectedNumbers = [...selectedNumbers.slice(1), number]
+      } else {
+        newSelectedNumbers = [...selectedNumbers, number]
+      }
+    }
+
+    return {
+      compoundBetting: {
+        ...state.compoundBetting,
+        selectedNumbers: newSelectedNumbers
+      }
+    }
+  }),
+
+  clearCompoundSelection: () => set(state => ({
+    compoundBetting: {
+      ...state.compoundBetting,
+      selectedNumbers: []
+    }
+  }))
 }))
 
 // Helper functions
@@ -255,6 +318,11 @@ function isWinningBet(bet: Bet, spinResult: SpinResult): boolean {
   
   switch (bet.betType) {
     case 'straight':
+      return bet.numbers.includes(winningNumber)
+    case 'split':
+    case 'street':
+    case 'corner':
+    case 'line':
       return bet.numbers.includes(winningNumber)
     case 'red':
       return color === 'red'
