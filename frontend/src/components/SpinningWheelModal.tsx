@@ -1,5 +1,5 @@
 // SpinningWheelModal.tsx
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import rouletteWheelImg from "../assets/roulette-wheel.png";
 
@@ -25,7 +25,7 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runActiveRef = useRef(false);
 
-  const SPIN_DURATION_MS = 3000;
+  const SPIN_DURATION_MS = 2000;
   const RESULT_DURATION_MS = 3000;
   const SLOTS = WHEEL_ORDER.length;
   const DEG_PER_SLOT = 360 / SLOTS;
@@ -131,7 +131,11 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
               alt="Roulette Wheel"
               style={{ originX: 0.5, originY: 0.5 }}
               animate={{ rotate: rotation }}
-              transition={{ duration: SPIN_DURATION_MS / 1000, ease: "easeOut" }}
+              transition={{ 
+                duration: SPIN_DURATION_MS / 1000, 
+                ease: [0.15, 0.1, 0.15, 1.0],
+                type: "tween"
+              }}
               className="w-full h-full rounded-full object-cover"
             />
             {/* Ball marker - purely decorative */}
