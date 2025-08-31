@@ -34,6 +34,13 @@ interface PlayerStats {
   winRate: number
 }
 
+interface BettingResult {
+  totalWagered: number
+  totalWon: number
+  netResult: number
+  participatedInRound: boolean
+}
+
 interface GameState {
   currentRoundId: string
   phase: 'betting' | 'spinning' | 'results'
@@ -49,6 +56,7 @@ interface GameState {
   playerStats: PlayerStats
   pendingResult: SpinResult | null
   isGameRunning: boolean
+  lastRoundResult: BettingResult | null
   compoundBetting: {
     isActive: boolean
     type: 'split' | 'street' | 'corner' | 'line' | null
@@ -65,6 +73,7 @@ interface GameStore extends GameState {
   spin: () => Promise<void>
   spinWheel: () => Promise<void>
   completeSpinResult: () => void
+  continueToNextRound: () => void
   updateGameState: (newState: Partial<GameState>) => void
   setPlayer: (player: Player) => void
   setCompoundBettingMode: (type: 'split' | 'street' | 'corner' | 'line' | null) => void
@@ -101,6 +110,7 @@ const useGameStore = create<GameStore>((set, get) => ({
   },
   pendingResult: null,
   isGameRunning: false,
+  lastRoundResult: null,
   compoundBetting: {
     isActive: false,
     type: null,
@@ -112,12 +122,26 @@ const useGameStore = create<GameStore>((set, get) => ({
 
   setPlayer: (player: Player) => set({ player }),
 
-  removeBet: (betId: string) => set((state) => ({
-    activeBets: state.activeBets.filter(bet => bet.id !== betId),
-    totalPot: state.activeBets
-      .filter(bet => bet.id !== betId)
-      .reduce((sum, bet) => sum + bet.amount, 0)
-  })),
+  removeBet: (betId: string) => set((state) => {
+    const betToRemove = state.activeBets.find(bet => bet.id === betId)
+    if (!betToRemove) return state
+    
+    return {
+      activeBets: state.activeBets.filter(bet => bet.id !== betId),
+      totalPot: state.activeBets
+        .filter(bet => bet.id !== betId)
+        .reduce((sum, bet) => sum + bet.amount, 0),
+      player: state.player ? {
+        ...state.player,
+        balance: state.player.balance + betToRemove.amount
+      } : null,
+      playerStats: {
+        ...state.playerStats,
+        totalWagered: state.playerStats.totalWagered - betToRemove.amount,
+        totalBets: state.playerStats.totalBets - 1
+      }
+    }
+  }),
 
   placeBet: async (betType: string, numbers: number[]) => {
     const state = get()
@@ -149,7 +173,12 @@ const useGameStore = create<GameStore>((set, get) => ({
         player: state.player ? {
           ...state.player,
           balance: state.player.balance - bet.amount
-        } : null
+        } : null,
+        playerStats: {
+          ...state.playerStats,
+          totalWagered: state.playerStats.totalWagered + bet.amount,
+          totalBets: state.playerStats.totalBets + 1
+        }
       }))
     } catch (error) {
       console.error('Failed to place bet:', error)
@@ -203,6 +232,15 @@ const useGameStore = create<GameStore>((set, get) => ({
 
     const spinResult = state.pendingResult
     const winnings = calculateWinnings(state.activeBets, spinResult)
+    const totalWagered = state.activeBets.reduce((sum, bet) => sum + bet.amount, 0)
+    
+    // Calculate betting result for this round
+    const bettingResult: BettingResult = {
+      totalWagered,
+      totalWon: winnings,
+      netResult: winnings - totalWagered, // This now correctly shows net profit/loss
+      participatedInRound: state.activeBets.length > 0
+    }
     
     set(state => ({
       phase: 'results',
@@ -210,17 +248,25 @@ const useGameStore = create<GameStore>((set, get) => ({
       activeBets: [],
       totalPot: 0,
       pendingResult: null,
+      lastRoundResult: bettingResult,
+      isGameRunning: false, // Stop the timer when showing results
       player: state.player ? {
         ...state.player,
         balance: state.player.balance + winnings,
         totalWinnings: state.player.totalWinnings + winnings
-      } : null
+      } : null,
+      playerStats: {
+        ...state.playerStats,
+        totalWon: state.playerStats.totalWon + winnings,
+        winRate: state.playerStats.totalWagered > 0 ? 
+          Math.round(((state.playerStats.totalWon + winnings) / state.playerStats.totalWagered) * 100) : 0
+      }
     }))
+  },
 
-    // Auto-start next round after 5 seconds
-    setTimeout(() => {
-      set({ phase: 'betting', timeRemaining: 30, isGameRunning: true })
-    }, 5000)
+  // New method to restart the game after viewing results
+  continueToNextRound: () => {
+    set({ phase: 'betting', timeRemaining: 30, isGameRunning: true })
   },
 
   updateGameState: (newState: Partial<GameState>) => set(newState),
@@ -306,7 +352,8 @@ function calculateWinnings(bets: Bet[], spinResult: SpinResult): number {
   
   for (const bet of bets) {
     if (isWinningBet(bet, spinResult)) {
-      totalWinnings += bet.potentialPayout
+      // Return original bet amount + winnings (potentialPayout already includes the original bet multiplied by odds)
+      totalWinnings += bet.amount + bet.potentialPayout
     }
   }
   

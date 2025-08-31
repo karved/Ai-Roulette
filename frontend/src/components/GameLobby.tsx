@@ -59,6 +59,16 @@ export default function GameLobby() {
             </div>
 
             <div className="flex items-center space-x-6">
+              {/* Total Pot Display - Between players and timer */}
+              {game.totalPot > 0 && (
+                <div className="flex items-center space-x-2 bg-primary-gold/20 border border-primary-gold/50 px-4 py-2 rounded-full">
+                  <span className="text-sm text-gray-300">Total Pot:</span>
+                  <span className="font-bold text-primary-gold text-lg">
+                    ${game.totalPot.toFixed(2)}
+                  </span>
+                </div>
+              )}
+
               {/* Game Phase with Circular Timer */}
               <div className="flex items-center space-x-3">
                 <div className="relative">
@@ -180,17 +190,6 @@ export default function GameLobby() {
                 <CompoundBetting />
               </div>
               
-              {/* Total Pot Display - Positioned relative to game area */}
-              {game.totalPot > 0 && (
-                <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-roulette-gold px-6 py-3 rounded-lg shadow-lg z-10">
-                  <div className="text-center">
-                    <div className="text-sm text-gray-400">Total Pot</div>
-                    <div className="text-xl font-bold text-roulette-gold">
-                      ${game.totalPot.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -213,9 +212,12 @@ export default function GameLobby() {
       <SpinningWheelModal
         isOpen={showSpinModal}
         result={spinResult}
+        bettingResult={game.lastRoundResult}
         onClose={() => {
           setShowSpinModal(false)
           setSpinResult(null)
+          // Restart timer when Continue is pressed
+          game.continueToNextRound()
         }}
         onSpinComplete={() => {
           game.completeSpinResult()

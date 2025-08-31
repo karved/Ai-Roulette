@@ -39,7 +39,7 @@ export default function CompactGameStats() {
                     <div className="flex items-center space-x-3">
                         <div className="text-right">
                             <div className="text-sm font-bold text-green-400">
-                                ${bet.potentialPayout.toFixed(2)}
+                                ${(bet.amount + bet.potentialPayout).toFixed(2)}
                             </div>
                             <div className="text-xs text-gray-400">
                                 {Math.round(bet.potentialPayout / bet.amount)}:1
@@ -63,7 +63,7 @@ export default function CompactGameStats() {
           {game.activeBets.length > 0 && (
             <div className="mt-3 pt-2 border-t border-white/10 text-xs text-gray-400 text-center">
               Total Bet: ${game.activeBets.reduce((sum, bet) => sum + bet.amount, 0).toFixed(2)} • 
-              Potential Win: ${game.activeBets.reduce((sum, bet) => sum + bet.potentialPayout, 0).toFixed(2)}
+              Potential Return: ${game.activeBets.reduce((sum, bet) => sum + bet.amount + bet.potentialPayout, 0).toFixed(2)}
             </div>
           )}
         </GlassmorphicCard>

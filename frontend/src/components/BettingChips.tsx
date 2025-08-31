@@ -66,7 +66,7 @@ export default function BettingChips() {
                   </span>
                 </div>
                 <span className="text-roulette-gold font-medium">
-                  ${bet.potentialPayout}
+                  ${(bet.amount + bet.potentialPayout).toFixed(2)}
                 </span>
               </div>
             ))}

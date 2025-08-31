@@ -3,11 +3,19 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import rouletteWheelImg from "../assets/roulette-wheel.png";
 
+interface BettingResult {
+  totalWagered: number;
+  totalWon: number;
+  netResult: number;
+  participatedInRound: boolean;
+}
+
 interface SpinningWheelModalProps {
   isOpen: boolean;
   onClose: () => void;
   result: number | null;
   onSpinComplete: () => void;
+  bettingResult?: BettingResult | null;
 }
 
 const WHEEL_ORDER = [
@@ -15,7 +23,7 @@ const WHEEL_ORDER = [
   24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26
 ]; // Standard European roulette wheel order (clockwise from 0)
 
-export default function SpinningWheelModal({ isOpen, onClose, result: propResult, onSpinComplete }: SpinningWheelModalProps) {
+export default function SpinningWheelModal({ isOpen, onClose, result: propResult, onSpinComplete, bettingResult }: SpinningWheelModalProps) {
   const [rotation, setRotation] = useState(0); // accumulated rotation degrees
   const [isSpinning, setIsSpinning] = useState(false);
   const [showResult, setShowResult] = useState(false);
@@ -26,7 +34,6 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
   const runActiveRef = useRef(false);
 
   const SPIN_DURATION_MS = 2000;
-  const RESULT_DURATION_MS = 3000;
   const SLOTS = WHEEL_ORDER.length;
   const DEG_PER_SLOT = 360 / SLOTS;
 
@@ -75,17 +82,7 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
         // Call onSpinComplete to trigger game state updates
         onSpinComplete();
 
-        // After result duration: hide result, reset run state, call onClose
-        resultTimerRef.current = setTimeout(() => {
-          setShowResult(false);
-          runActiveRef.current = false;
-          clearTimers();
-          try {
-            onClose();
-          } catch {
-            // ignore errors from parent handler
-          }
-        }, RESULT_DURATION_MS);
+        // No auto-close timer - user will click Continue button
       }, SPIN_DURATION_MS);
     }
 
@@ -149,9 +146,56 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
           <div className="text-center">
             <h3 className="text-xl font-bold text-white mb-1">Winning Number</h3>
             <div className={`text-5xl font-extrabold ${getNumberColor(result)} mb-1`}>{result}</div>
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-gray-400 mb-3">
               {result === 0 ? "Green" : (getNumberColor(result) === "text-red-400" ? "Red" : "Black")}
             </div>
+            
+            {/* Betting Result Display */}
+            {bettingResult && (
+              <div className="mt-4 p-3 bg-gray-700 rounded-lg">
+                {!bettingResult.participatedInRound ? (
+                  <div className="text-gray-300 text-sm font-medium">
+                    💤 You did not participate in this round
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="text-xs text-gray-400">Your Result</div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-300">Wagered:</span>
+                      <span className="text-red-400">-${bettingResult.totalWagered.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-300">Won:</span>
+                      <span className="text-green-400">+${bettingResult.totalWon.toFixed(2)}</span>
+                    </div>
+                    <div className="border-t border-gray-600 pt-1 mt-2">
+                      <div className="flex justify-between items-center font-semibold">
+                        <span className="text-white">Net Result:</span>
+                        <span className={`${bettingResult.netResult >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {bettingResult.netResult >= 0 ? '+' : ''}${bettingResult.netResult.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Continue Button */}
+            <button
+              onClick={() => {
+                setShowResult(false);
+                runActiveRef.current = false;
+                try {
+                  onClose();
+                } catch {
+                  // ignore errors from parent handler
+                }
+              }}
+              className="mt-4 bg-primary-gold hover:bg-yellow-400 text-black font-bold py-2 px-6 rounded-lg transition-colors shadow-lg"
+            >
+              Continue
+            </button>
           </div>
         )}
       </div>

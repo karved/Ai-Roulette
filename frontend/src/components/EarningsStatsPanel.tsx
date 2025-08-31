@@ -26,10 +26,11 @@ const StatsCard = ({ title, value, tooltip, icon: Icon, bgColor, textColor }: {
 )
 
 export default function EarningsStatsPanel() {
-  const { playerStats } = useGame()
+  const { playerStats, player } = useGame()
   
   // Calculate stats from player data
   const stats = {
+    currentBalance: player?.balance || 0,
     totalWon: playerStats?.totalWon || 0,
     totalWagered: playerStats?.totalWagered || 0,
     totalBets: playerStats?.totalBets || 0,
@@ -44,8 +45,8 @@ export default function EarningsStatsPanel() {
       <div className="grid grid-cols-2 gap-2">
         <StatsCard
           title="Balance"
-          value={`$${stats.totalWon.toFixed(2)}`}
-          tooltip={`Total winnings: $${stats.totalWon.toFixed(2)}`}
+          value={`$${stats.currentBalance.toFixed(2)}`}
+          tooltip={`Current balance: $${stats.currentBalance.toFixed(2)}`}
           icon={DollarSign}
           bgColor="bg-yellow-900/30"
           textColor="text-yellow-400"

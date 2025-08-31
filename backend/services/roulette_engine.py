@@ -1,7 +1,6 @@
 import random
 import uuid
 from typing import List, Dict, Any
-from datetime import datetime
 from models.game import Bet, SpinResult, BetType, Payout
 
 class RouletteEngine:
@@ -89,10 +88,12 @@ class RouletteEngine:
         
         for bet in self.current_bets:
             if self._is_winning_bet(bet, spin_result):
+                # Return original bet amount + winnings (potential_payout is just the winnings)
+                total_payout = bet.amount + bet.potential_payout
                 payout = Payout(
                     player_id=bet.player_id,
                     bet_id=bet.id,
-                    amount=bet.potential_payout,
+                    amount=total_payout,
                     winning_numbers=[spin_result.winning_number]
                 )
                 payouts.append(payout)
