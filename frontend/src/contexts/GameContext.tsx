@@ -48,6 +48,7 @@ interface GameState {
   player: Player | null
   playerStats: PlayerStats
   pendingResult: SpinResult | null
+  isGameRunning: boolean
 }
 
 // Zustand store
@@ -56,6 +57,7 @@ interface GameStore extends GameState {
   removeBet: (betId: string) => void
   placeBet: (betType: string, numbers: number[]) => Promise<void>
   spin: () => Promise<void>
+  spinWheel: () => Promise<void>
   completeSpinResult: () => void
   updateGameState: (newState: Partial<GameState>) => void
   setPlayer: (player: Player) => void
@@ -79,7 +81,7 @@ const useGameStore = create<GameStore>((set, get) => ({
     { number: 2, count: 2 },
     { number: 34, count: 2 }
   ],
-  playerCount: 3,
+  playerCount: 1,
   selectedChip: 5,
   player: null,
   playerStats: {
@@ -89,6 +91,7 @@ const useGameStore = create<GameStore>((set, get) => ({
     winRate: 0
   },
   pendingResult: null,
+  isGameRunning: false,
 
   // Actions
   setSelectedChip: (amount: number) => set({ selectedChip: amount }),
@@ -169,6 +172,17 @@ const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
+  spinWheel: async () => {
+    const state = get()
+    if (state.phase === 'betting' && !state.isGameRunning) {
+      // Start the game
+      set({ isGameRunning: true, timeRemaining: 30 })
+    } else if (state.phase === 'spinning' || state.isGameRunning) {
+      // Pause the game
+      set({ isGameRunning: false, phase: 'betting' })
+    }
+  },
+
   completeSpinResult: () => {
     const state = get()
     if (state.phase !== 'spinning' || !state.pendingResult) return
@@ -191,7 +205,7 @@ const useGameStore = create<GameStore>((set, get) => ({
 
     // Auto-start next round after 5 seconds
     setTimeout(() => {
-      set({ phase: 'betting', timeRemaining: 30 })
+      set({ phase: 'betting', timeRemaining: 30, isGameRunning: true })
     }, 5000)
   },
 
@@ -267,21 +281,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
   
   // Betting countdown and auto-spin
   useEffect(() => {
-    if (gameStore.phase !== 'betting') return
+    if (!gameStore.isGameRunning || gameStore.phase !== 'betting') return
     // Tick every 1s
     const interval = setInterval(() => {
-      const { timeRemaining, phase } = useGameStore.getState()
-      if (phase !== 'betting') return
+      const { timeRemaining, phase, isGameRunning } = useGameStore.getState()
+      if (phase !== 'betting' || !isGameRunning) return
       if (timeRemaining > 0) {
         useGameStore.setState({ timeRemaining: timeRemaining - 1 })
       } else {
         clearInterval(interval)
-        // Always spin when timer reaches 0, regardless of bets
+        // Auto-spin when timer reaches 0
         useGameStore.getState().spin()
       }
     }, 1000)
     return () => clearInterval(interval)
-  }, [gameStore.phase])
+  }, [gameStore.phase, gameStore.isGameRunning])
 
   return (
     <GameContext.Provider value={gameStore}>

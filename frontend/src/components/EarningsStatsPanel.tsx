@@ -1,19 +1,20 @@
 import { useGame } from '../contexts/GameContext'
-import { TrendingUp, TrendingDown, DollarSign, BarChart2 } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, BarChart2, Coins } from 'lucide-react'
 import { Tooltip } from './ui/Tooltip'
 
-const StatsCard = ({ title, value, tooltip, icon: Icon, isPositive = true }: { 
+const StatsCard = ({ title, value, tooltip, icon: Icon, bgColor, textColor }: { 
   title: string
   value: string
   tooltip: string
   icon: React.ElementType
-  isPositive?: boolean
+  bgColor: string
+  textColor: string
 }) => (
   <Tooltip content={tooltip}>
     <div className="bg-black/30 backdrop-blur-lg border border-white/10 rounded-xl p-3 transition-all duration-200 hover:border-primary-gold/50">
       <div className="flex items-center space-x-3">
-        <div className={`p-2 rounded-lg ${isPositive ? 'bg-green-900/30' : 'bg-red-900/30'}`}>
-          <Icon className={`w-4 h-4 ${isPositive ? 'text-green-400' : 'text-red-400'}`} />
+        <div className={`p-2 rounded-lg ${bgColor}`}>
+          <Icon className={`w-4 h-4 ${textColor}`} />
         </div>
         <div className="min-w-0">
           <p className="text-xs text-gray-400 truncate">{title}</p>
@@ -46,28 +47,32 @@ export default function EarningsStatsPanel() {
           value={`$${stats.totalWon.toFixed(2)}`}
           tooltip={`Total winnings: $${stats.totalWon.toFixed(2)}`}
           icon={DollarSign}
-          isPositive={true}
+          bgColor="bg-yellow-900/30"
+          textColor="text-yellow-400"
         />
         <StatsCard
           title="Wagered"
           value={`$${stats.totalWagered.toFixed(2)}`}
           tooltip={`Total amount wagered`}
-          icon={DollarSign}
-          isPositive={true}
+          icon={Coins}
+          bgColor="bg-red-900/30"
+          textColor="text-red-400"
         />
         <StatsCard
           title="Net"
           value={`${stats.netChange >= 0 ? '+' : '-'}$${Math.abs(stats.netChange).toFixed(2)}`}
           tooltip={`${stats.netChange >= 0 ? 'Profit' : 'Loss'} of $${Math.abs(stats.netChange).toFixed(2)}`}
           icon={stats.netChange >= 0 ? TrendingUp : TrendingDown}
-          isPositive={stats.netChange >= 0}
+          bgColor={stats.netChange >= 0 ? 'bg-green-900/30' : 'bg-red-900/30'}
+          textColor={stats.netChange >= 0 ? 'text-green-400' : 'text-red-400'}
         />
         <StatsCard
           title="Win Rate"
           value={`${stats.winRate}%`}
           tooltip={`${stats.winRate}% win rate across ${stats.totalBets} bets`}
           icon={BarChart2}
-          isPositive={stats.winRate >= 50}
+          bgColor="bg-purple-900/30"
+          textColor="text-purple-400"
         />
       </div>
     </div>

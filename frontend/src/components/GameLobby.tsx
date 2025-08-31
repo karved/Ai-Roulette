@@ -121,25 +121,25 @@ export default function GameLobby() {
       </header>
 
       {/* Main Game Area */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-6">
         {/* Mobile Landscape Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4">
           {/* Left Sidebar - Stats */}
-          <div className="lg:col-span-3 order-2 lg:order-1 space-y-6">
+          <div className="lg:col-span-3 order-2 lg:order-1 space-y-4">
             <EarningsStatsPanel />
             <CompactGameStats />
           </div>
 
           {/* Main Game Area */}
-          <div className="lg:col-span-6 order-1 lg:order-2 space-y-4">
+          <div className="lg:col-span-5 order-1 lg:order-2 space-y-4">
             {/* Recent Spins */}
-            <div className="bg-gradient-to-b from-green-900 to-green-800 border border-green-700/50 rounded-xl p-4 shadow-2xl">
-              <h3 className="text-sm font-semibold text-green-200 mb-3 tracking-wide">Recent Spins</h3>
-              <div className="flex space-x-3 overflow-x-auto pb-2">
+            <div className="bg-gradient-to-b from-gray-900 to-gray-800 border border-gray-700/50 rounded-xl p-4 shadow-2xl">
+              <h3 className="text-sm font-semibold text-gray-200 mb-3 tracking-wide">Recent Spins</h3>
+              <div className="flex space-x-2 pb-2">
                 {game.recentSpins.slice(0, 10).map((spin, index) => (
                   <div 
                     key={index}
-                    className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm relative
+                    className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-xs relative
                       shadow-lg transform transition-all duration-200 hover:scale-110 hover:shadow-xl
                       ${spin.color === 'red' 
                         ? 'bg-gradient-to-br from-red-400 via-red-600 to-red-800 shadow-red-500/30' 
@@ -148,11 +148,11 @@ export default function GameLobby() {
                           : 'bg-gradient-to-br from-green-400 via-green-600 to-green-800 shadow-green-500/30'
                       }
                       before:absolute before:inset-1 before:rounded-full before:bg-gradient-to-br before:from-white/30 before:to-transparent before:opacity-60
-                      after:absolute after:top-2 after:left-2 after:w-3 after:h-3 after:rounded-full after:bg-white/40 after:blur-sm`}
+                      after:absolute after:top-1 after:left-1 after:w-2 after:h-2 after:rounded-full after:bg-white/40 after:blur-sm`}
                     style={{
                       boxShadow: `
-                        0 4px 8px rgba(0, 0, 0, 0.3),
-                        0 2px 4px rgba(0, 0, 0, 0.2),
+                        0 3px 6px rgba(0, 0, 0, 0.3),
+                        0 1px 3px rgba(0, 0, 0, 0.2),
                         inset 0 1px 2px rgba(255, 255, 255, 0.3),
                         inset 0 -1px 2px rgba(0, 0, 0, 0.3)
                       `
@@ -164,25 +164,37 @@ export default function GameLobby() {
                   </div>
                 ))}
                 {game.recentSpins.length === 0 && (
-                  <p className="text-sm text-green-300/70 italic">No spins yet</p>
+                  <p className="text-sm text-gray-300/70 italic">No spins yet</p>
                 )}
               </div>
             </div>
             
             {/* Roulette Table */}
-            <div className="bg-[#0a5c36] rounded-xl p-2 border border-white/10">
+            <div className="bg-[#0a5c36] rounded-xl p-2 border border-white/10 relative">
               <ProperRouletteTable />
               
               {/* Betting Chips */}
               <div className="mt-2">
                 <ImprovedBettingChips />
               </div>
+              
+              {/* Total Pot Display - Positioned relative to game area */}
+              {game.totalPot > 0 && (
+                <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-roulette-gold px-6 py-3 rounded-lg shadow-lg z-10">
+                  <div className="text-center">
+                    <div className="text-sm text-gray-400">Total Pot</div>
+                    <div className="text-xl font-bold text-roulette-gold">
+                      ${game.totalPot.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right Sidebar - AI Assistant */}
-          <div className="lg:col-span-3 order-3">
-            <div className="bg-black/30 backdrop-blur-lg border border-white/10 rounded-xl p-4 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+          <div className="lg:col-span-4 order-3">
+            <div className="bg-black/30 backdrop-blur-lg border border-white/10 rounded-xl p-4 pb-6 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
               <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center">
                 <span className="mr-2">🤖</span> AI Assistant
               </h3>
@@ -194,17 +206,6 @@ export default function GameLobby() {
         </div>
       </div>
 
-      {/* Total Pot Display */}
-      {game.totalPot > 0 && (
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-roulette-gold px-6 py-3 rounded-lg shadow-lg">
-          <div className="text-center">
-            <div className="text-sm text-gray-400">Total Pot</div>
-            <div className="text-xl font-bold text-roulette-gold">
-              ${game.totalPot.toFixed(2)}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Spinning Wheel Modal */}
       <SpinningWheelModal

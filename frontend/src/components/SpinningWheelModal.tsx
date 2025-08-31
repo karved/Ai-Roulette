@@ -26,7 +26,7 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
   const runActiveRef = useRef(false);
 
   const SPIN_DURATION_MS = 3000;
-  const RESULT_DURATION_MS = 5000;
+  const RESULT_DURATION_MS = 3000;
   const SLOTS = WHEEL_ORDER.length;
   const DEG_PER_SLOT = 360 / SLOTS;
 

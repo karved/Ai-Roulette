@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useGame } from '../contexts/GameContext'
-import { Mic, MicOff, Send, Bot } from 'lucide-react'
+import { Mic, MicOff, Send } from 'lucide-react'
 
 interface Message {
   id: string
@@ -170,14 +170,9 @@ export default function IntegratedAssistant() {
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 flex flex-col">
-      <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-        <Bot className="w-5 h-5 text-roulette-gold mr-2" />
-        AI Assistant
-      </h3>
-      
+    <div className="h-full flex flex-col">
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto mb-4 space-y-3 max-h-64">
+      <div className="flex-1 overflow-y-auto mb-4 space-y-3">
         {messages.map((message) => (
           <div
             key={message.id}
