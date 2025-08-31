@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Poppins', sans-serif;
+  }
+  
+  body {
+    margin: 0;
+    background-color: #121212; /* Deep charcoal black */
+    color: white;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  .chip {
+    @apply w-12 h-12 rounded-full border-4 border-white shadow-lg cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95;
+  }
+  
+  .chip-1 { @apply bg-red-500; }
+  .chip-5 { @apply bg-blue-500; }
+  .chip-10 { @apply bg-green-500; }
+  .chip-25 { @apply bg-purple-500; }
+  .chip-100 { @apply bg-yellow-500; }
+  
+  .roulette-number {
+    @apply w-8 h-8 flex items-center justify-center text-sm font-bold rounded cursor-pointer transition-all duration-200 hover:scale-110;
+  }
+  
+  .roulette-red {
+    @apply bg-roulette-red text-white;
+  }
+  
+  .roulette-black {
+    @apply bg-roulette-black text-white;
+  }
+  
+  .roulette-green {
+    @apply bg-roulette-green text-white;
+  }
+}
