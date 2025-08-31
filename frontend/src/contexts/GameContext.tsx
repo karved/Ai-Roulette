@@ -270,18 +270,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (gameStore.phase !== 'betting') return
     // Tick every 1s
     const interval = setInterval(() => {
-      const { timeRemaining, activeBets, phase } = useGameStore.getState()
+      const { timeRemaining, phase } = useGameStore.getState()
       if (phase !== 'betting') return
       if (timeRemaining > 0) {
         useGameStore.setState({ timeRemaining: timeRemaining - 1 })
       } else {
         clearInterval(interval)
-        // Auto-spin if there are bets, otherwise reset timer
-        if (activeBets.length > 0) {
-          useGameStore.getState().spin()
-        } else {
-          useGameStore.setState({ timeRemaining: 30 })
-        }
+        // Always spin when timer reaches 0, regardless of bets
+        useGameStore.getState().spin()
       }
     }, 1000)
     return () => clearInterval(interval)
