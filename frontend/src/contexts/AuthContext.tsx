@@ -141,6 +141,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authService.clearToken()
       setUser(null)
       setLoading(false)
+      
+      // Navigation will be handled by the ProtectedRoute component
+      // when it detects user is null
     } catch (error) {
       console.error('Error during sign out:', error)
       // Force logout even if there's an error
