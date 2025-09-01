@@ -1,8 +1,18 @@
 from supabase import create_client, Client
-from typing import List, Dict, Any, Optional
-from models.game import Player, GameState, SpinResult, Bet, Payout
+from typing import List, Dict, Any
+from models.game import GameState, Payout
 from datetime import datetime, timedelta
 import os
+
+def get_service_supabase() -> Client:
+    """Get Supabase client with service role key"""
+    supabase_url = os.getenv("SUPABASE_URL")
+    service_key = os.getenv("SUPABASE_SERVICE_KEY")
+    
+    if supabase_url and service_key:
+        return create_client(supabase_url, service_key)
+    else:
+        raise Exception("Supabase service credentials not found")
 
 class DatabaseService:
     """Database service using Supabase"""
@@ -15,7 +25,6 @@ class DatabaseService:
             self.supabase: Client = create_client(supabase_url, supabase_key)
         else:
             self.supabase = None
-            print("Warning: Supabase credentials not found, using mock data")
 
     async def get_game_state(self, player_id: str) -> GameState:
         """Get current game state for a player"""
@@ -23,30 +32,40 @@ class DatabaseService:
             if not self.supabase:
                 return self._mock_game_state()
             
-            # Get recent spins
-            recent_spins_response = self.supabase.table("spins").select("*").order("spun_at", desc=True).limit(10).execute()
-            recent_spins = [SpinResult(**spin) for spin in recent_spins_response.data]
+            # Get recent spins from game_rounds table
+            recent_spins_response = self.supabase.table("game_rounds").select("winning_number, color, is_even, is_low, dozen, roulette_column, spun_at").not_.is_("winning_number", "null").order("spun_at", desc=True).limit(10).execute()
+            recent_spins = []
+            for spin in recent_spins_response.data:
+                if spin["winning_number"] is not None:
+                    recent_spins.append({
+                        "winning_number": spin["winning_number"],
+                        "color": spin["color"],
+                        "is_even": spin["is_even"],
+                        "is_low": spin["is_low"],
+                        "dozen": spin["dozen"],
+                        "column": spin["roulette_column"],
+                        "spun_at": spin["spun_at"]
+                    })
             
             # Get active bets for current round
-            active_bets_response = self.supabase.table("bets").select("*").eq("round_active", True).execute()
-            active_bets = [Bet(**bet) for bet in active_bets_response.data]
+            active_bets_response = self.supabase.table("bets").select("*").is_("is_winner", "null").execute()
+            active_bets = active_bets_response.data
             
-            # Calculate analytics
-            hot_cold_numbers = await self._calculate_hot_cold_numbers()
+            # Get hot/cold numbers from database view
+            hot_cold_numbers = await self._get_hot_cold_from_view()
             
             return GameState(
                 current_round_id="current-round",
                 phase="betting",
                 time_remaining=30,
-                total_pot=sum(bet.amount for bet in active_bets),
+                total_pot=sum(bet.get("amount", 0) for bet in active_bets),
                 active_bets=active_bets,
                 recent_spins=recent_spins,
-                hot_numbers=hot_cold_numbers["hot"],
-                cold_numbers=hot_cold_numbers["cold"],
+                hot_numbers=hot_cold_numbers.get("hot", []),
+                cold_numbers=hot_cold_numbers.get("cold", []),
                 player_count=await self._get_active_player_count()
             )
-        except Exception as e:
-            print(f"Database error: {e}")
+        except Exception:
             return self._mock_game_state()
 
     async def update_balances(self, payouts: List[Payout]) -> None:
@@ -67,10 +86,11 @@ class DatabaseService:
                     "player_id": payout.player_id,
                     "bet_id": payout.bet_id,
                     "amount": payout.amount,
-                    "paid_at": datetime.utcnow().isoformat()
+                    "round_id": payout.round_id,
+                "paid_at": datetime.utcnow().isoformat()
                 }).execute()
-        except Exception as e:
-            print(f"Error updating balances: {e}")
+        except Exception:
+            pass
 
     async def get_leaderboard(self) -> List[Dict[str, Any]]:
         """Get player leaderboard"""
@@ -83,8 +103,7 @@ class DatabaseService:
             ).order("total_winnings", desc=True).limit(10).execute()
             
             return response.data
-        except Exception as e:
-            print(f"Error getting leaderboard: {e}")
+        except Exception:
             return self._mock_leaderboard()
 
     async def get_analytics(self) -> Dict[str, Any]:
@@ -93,8 +112,8 @@ class DatabaseService:
             if not self.supabase:
                 return self._mock_analytics()
             
-            # Get recent spins for analysis
-            recent_spins_response = self.supabase.table("spins").select("winning_number").order("spun_at", desc=True).limit(100).execute()
+            # Get recent spins for analysis from game_rounds
+            recent_spins_response = self.supabase.table("game_rounds").select("winning_number").not_.is_("winning_number", "null").order("spun_at", desc=True).limit(100).execute()
             
             numbers = [spin["winning_number"] for spin in recent_spins_response.data]
             number_counts = {}
@@ -114,57 +133,75 @@ class DatabaseService:
                 "total_spins": len(numbers),
                 "last_updated": datetime.utcnow().isoformat()
             }
-        except Exception as e:
-            print(f"Error getting analytics: {e}")
+        except Exception:
             return self._mock_analytics()
 
-    async def save_spin_result(self, spin_result: SpinResult) -> None:
-        """Save spin result to database"""
+    async def save_spin_result(self, round_id: str, winning_number: int, color: str, is_even: bool, is_low: bool, dozen: int, column: int) -> None:
+        """Save spin result to game_rounds table"""
         if not self.supabase:
             return
         
         try:
-            self.supabase.table("spins").insert({
-                "id": spin_result.id,
-                "round_id": spin_result.round_id,
-                "winning_number": spin_result.winning_number,
-                "color": spin_result.color,
-                "is_even": spin_result.is_even,
-                "is_low": spin_result.is_low,
-                "dozen": spin_result.dozen,
-                "column": spin_result.column,
-                "spun_at": spin_result.spun_at.isoformat()
-            }).execute()
-        except Exception as e:
-            print(f"Error saving spin result: {e}")
+            self.supabase.table("game_rounds").update({
+                "winning_number": winning_number,
+                "color": color,
+                "is_even": is_even,
+                "is_low": is_low,
+                "dozen": dozen,
+                "roulette_column": column,
+                "spun_at": datetime.utcnow().isoformat(),
+                "phase": "completed"
+            }).eq("id", round_id).execute()
+        except Exception:
+            pass
 
-    async def save_bet(self, bet: Bet) -> None:
+    async def save_bet(self, player_id: str, round_id: str, bet_type: str, bet_data: dict, amount: float, potential_payout: float) -> None:
         """Save bet to database"""
         if not self.supabase:
             return
         
         try:
             self.supabase.table("bets").insert({
-                "id": bet.id,
-                "player_id": bet.player_id,
-                "round_id": bet.round_id,
-                "bet_type": bet.bet_type.value,
-                "numbers": bet.numbers,
-                "amount": bet.amount,
-                "potential_payout": bet.potential_payout,
-                "placed_at": bet.placed_at.isoformat(),
-                "round_active": True
+                "player_id": player_id,
+                "round_id": round_id,
+                "bet_type": bet_type,
+                "bet_data": bet_data,
+                "amount": amount,
+                "potential_payout": potential_payout,
+                "placed_at": datetime.utcnow().isoformat()
             }).execute()
-        except Exception as e:
-            print(f"Error saving bet: {e}")
+        except Exception:
+            pass
 
-    async def _calculate_hot_cold_numbers(self) -> Dict[str, List[Dict[str, Any]]]:
-        """Calculate hot and cold numbers from recent spins"""
+    async def _get_hot_cold_from_view(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Get hot and cold numbers from database view"""
         if not self.supabase:
             return {"hot": [], "cold": []}
         
-        # This would be implemented with proper SQL queries
-        return {"hot": [], "cold": []}
+        try:
+            # Use the hot_cold_numbers view from the database schema
+            response = self.supabase.table("hot_cold_numbers").select("*").execute()
+            
+            hot_numbers = []
+            cold_numbers = []
+            
+            for row in response.data:
+                number_data = {
+                    "number": row["winning_number"],
+                    "count": row["hit_count"]
+                }
+                
+                if row["temperature"] == "hot":
+                    hot_numbers.append(number_data)
+                elif row["temperature"] == "cold":
+                    cold_numbers.append(number_data)
+            
+            return {
+                "hot": hot_numbers,
+                "cold": cold_numbers
+            }
+        except Exception:
+            return {"hot": [], "cold": []}
 
     async def _get_active_player_count(self) -> int:
         """Get count of active players"""
@@ -176,7 +213,7 @@ class DatabaseService:
             cutoff_time = datetime.utcnow() - timedelta(minutes=5)
             response = self.supabase.table("players").select("id").gte("last_active", cutoff_time.isoformat()).execute()
             return len(response.data)
-        except:
+        except Exception:
             return 1
 
     def _mock_game_state(self) -> GameState:

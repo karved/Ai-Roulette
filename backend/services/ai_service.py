@@ -1,6 +1,6 @@
 import re
 import openai
-from typing import Optional, Dict, Any, List
+from typing import Optional
 from models.game import BetCommand, BetType, Player
 import os
 
@@ -38,13 +38,53 @@ class AIService:
 
     async def _openai_chat(self, message: str, player: Player) -> str:
         """Chat using OpenAI API"""
-        system_prompt = f"""You are an AI assistant for a roulette game. Help the player with:
-        - Game rules and betting strategies
-        - Explaining odds and payouts
-        - General roulette guidance
-        
-        Player info: {player.username}, Balance: ${player.balance}
-        Keep responses concise and helpful."""
+        system_prompt = f"""You are an AI assistant for a multiplayer roulette game. Help the player with game rules, betting strategies, and guidance.
+
+GAME RULES:
+- European roulette wheel (0-36, single zero)
+- Players start with $100 balance
+- Betting phase: 30 seconds to place bets
+- Spinning phase: wheel spins, no betting allowed
+- Results phase: payouts calculated, leaderboard updated
+
+BET TYPES & PAYOUTS:
+- Straight (single number): 35:1 payout
+- Split (2 adjacent numbers): 17:1 payout
+- Street (3 numbers in row): 11:1 payout
+- Corner (4 numbers in square): 8:1 payout
+- Line (6 numbers in two rows): 5:1 payout
+- Red/Black: 1:1 payout (18 numbers each)
+- Even/Odd: 1:1 payout (18 numbers each) 
+- Low (1-18)/High (19-36): 1:1 payout
+- Dozens (1-12, 13-24, 25-36): 2:1 payout
+- Columns: 2:1 payout
+
+COMPOUND BETTING FEATURES:
+- Split: Select 2 adjacent numbers (horizontal/vertical)
+- Street: Select 3 consecutive numbers in same row
+- Corner: Select 4 numbers forming 2x2 square
+- Line: Select 6 consecutive numbers spanning 2 rows
+- Validation ensures proper number adjacency/patterns
+- Visual selection on roulette table with gold highlighting
+
+GAME STATE & FEATURES:
+- Player: {player.username}
+- Balance: ${player.balance}
+- Multi-input support: voice commands, mouse clicks, keyboard
+- Voice recognition with speech-to-text parsing
+- Recent rolls tracking (last 10 spins)
+- Compound betting mode with visual selection
+- Bet removal/undo functionality
+- Automatic game phase transitions
+- WebSocket real-time updates
+
+VOICE COMMANDS SUPPORTED:
+- "bet [amount] on [red/black/even/odd/low/high]"
+- "place [amount] on number [0-36]"
+- "remove bet on [type]" or "undo [type]"
+- Common speech recognition error corrections built-in
+
+Keep responses concise, helpful, and focused on roulette strategy and rules."""
         
         response = self.openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -91,7 +131,7 @@ class AIService:
                 confidence=parsed["confidence"],
                 raw_command=command
             )
-        except:
+        except (json.JSONDecodeError, KeyError, ValueError):
             return None
 
     def _fallback_chat_response(self, message: str) -> str:

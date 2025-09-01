@@ -80,3 +80,38 @@ class BetCommand(BaseModel):
     amount: float
     confidence: float  # 0.0 to 1.0
     raw_command: str
+
+class BetRequest(BaseModel):
+    """Request to place a bet"""
+    bet_type: str
+    numbers: List[int]
+    amount: float
+
+class BetResponse(BaseModel):
+    """Response after placing a bet"""
+    success: bool
+    bet_id: Optional[str]
+    message: str
+    new_balance: float
+    potential_payout: float
+
+class SpinRequest(BaseModel):
+    """Request to spin the wheel"""
+    player_id: str
+
+class SpinResponse(BaseModel):
+    """Response after spinning"""
+    winning_number: int
+    color: str
+    payouts: List[Payout]
+    new_balance: float
+    total_won: float
+
+class GameRoom(BaseModel):
+    """Game room for future multiplayer"""
+    room_id: str
+    players: List[str] = []
+    max_players: int = 8
+    current_round_id: str
+    phase: str = "betting"
+    created_at: datetime = datetime.utcnow()
