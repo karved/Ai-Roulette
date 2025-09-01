@@ -51,7 +51,7 @@ export default function IntegratedAssistant() {
       if (betCommand && game.phase === 'betting') {
         try {
           game.setSelectedChip(betCommand.amount)
-          await game.placeBet(betCommand.betType, betCommand.numbers)
+          await game.placeBet(betCommand.betType, betCommand.numbers, betCommand.amount)
           
           const botMessage: Message = {
             id: Date.now().toString(),
@@ -128,7 +128,7 @@ export default function IntegratedAssistant() {
       if (betCommand && game.phase === 'betting') {
         try {
           game.setSelectedChip(betCommand.amount)
-          await game.placeBet(betCommand.betType, betCommand.numbers)
+          await game.placeBet(betCommand.betType, betCommand.numbers, betCommand.amount)
           
           const botMessage: Message = {
             id: Date.now().toString(),

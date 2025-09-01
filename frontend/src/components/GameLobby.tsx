@@ -15,17 +15,49 @@ export default function GameLobby() {
   const game = useGame()
   const [showSpinModal, setShowSpinModal] = useState(false)
   const [spinResult, setSpinResult] = useState<number | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isInitializing, setIsInitializing] = useState(true)
 
   useEffect(() => {
-    // Set player data when component mounts
-    if (user && !game.player) {
-      game.setPlayer({
-        id: user.id,
-        username: user.email?.split('@')[0] || 'Player',
-        balance: 100,
-        totalWinnings: 0
-      })
+    const initializePlayer = async () => {
+      if (user && !game.player) {
+        setIsInitializing(true)
+        
+        // Set temporary player data for immediate UI response
+        game.setPlayer({
+          id: user.id,
+          username: user.email?.split('@')[0] || 'Player',
+          balance: 100, // Default starting balance
+          totalWinnings: 0
+        })
+        
+        // Initialize frontend-only player stats and start the game
+        game.updateGameState({
+          playerStats: {
+            totalWon: 0,
+            totalWagered: 0,
+            totalBets: 0,
+            winRate: 0
+          },
+          isGameRunning: false, // Start paused
+          phase: 'betting',
+          timeRemaining: 30
+        })
+        
+        // Load real player stats from backend (will update the UI when complete)
+        try {
+          await game.loadPlayerStats(user.id)
+        } catch (error) {
+          console.error('Failed to load player stats:', error)
+        }
+        
+        setIsInitializing(false)
+      }
+      
+      setIsLoading(false)
     }
+    
+    initializePlayer()
   }, [user, game])
 
   // Watch for spin phase changes to show modal
@@ -33,7 +65,8 @@ export default function GameLobby() {
     if (game.phase === 'spinning') {
       setShowSpinModal(true)
       // Set the spin result from pendingResult when available
-      if (game.pendingResult) {
+      if (game.pendingResult && game.pendingResult.winningNumber !== 0) {
+        console.log('GameLobby: Setting wheel to show backend number:', game.pendingResult.winningNumber)
         setSpinResult(game.pendingResult.winningNumber)
       }
     } else if (game.phase === 'results' && game.recentSpins.length > 0) {
@@ -43,6 +76,23 @@ export default function GameLobby() {
 
   // Format time is now handled directly in the JSX
 
+
+  // Show loading screen during initial load or when switching between auth states
+  if (isLoading || isInitializing) {
+    return (
+      <div className="min-h-screen bg-background font-sans flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-gold mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-white mb-2">
+            {isInitializing ? 'Loading Player Data...' : 'Initializing Game...'}
+          </h2>
+          <p className="text-gray-400">
+            {isInitializing ? 'Fetching your latest stats and balance' : 'Setting up your game session'}
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background font-sans">
@@ -69,38 +119,62 @@ export default function GameLobby() {
                 </div>
               )}
 
+
+
+              {/* Debug Spin Button */}
+              {game.phase === 'betting' && game.isGameRunning && (
+                <button
+                  onClick={() => game.spin()}
+                  className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
+                  title="Debug: Spin immediately"
+                >
+                  Spin Now
+                </button>
+              )}
+
               {/* Game Phase with Circular Timer */}
               <div className="flex items-center space-x-3">
                 <div className="relative">
                   <div 
                     className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      game.timeRemaining <= 5 ? 'animate-pulse' : ''
+                      game.timeRemaining <= 5 && game.isGameRunning ? 'animate-pulse' : ''
                     }`}
                     style={{
-                      background: 'radial-gradient(circle, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%)',
-                      boxShadow: '0 0 10px rgba(255, 209, 102, 0.2)'
+                      background: game.isGameRunning 
+                        ? 'radial-gradient(circle, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%)'
+                        : 'radial-gradient(circle, rgba(100,100,100,0.3) 0%, rgba(100,100,100,0.7) 100%)',
+                      boxShadow: game.isGameRunning 
+                        ? '0 0 10px rgba(255, 209, 102, 0.2)'
+                        : '0 0 10px rgba(150, 150, 150, 0.2)'
                     }}
                   >
-                    <span className="text-white font-bold text-sm">
-                      {game.timeRemaining > 0 ? game.timeRemaining : 'GO'}
+                    <span className={`font-bold text-sm ${
+                      game.isGameRunning ? 'text-white' : 'text-gray-400'
+                    }`}>
+                      {game.isGameRunning && game.timeRemaining > 0 ? game.timeRemaining : game.isGameRunning ? 'GO' : game.timeRemaining}
                     </span>
                     <div 
-                      className="absolute inset-0 rounded-full border-2 border-primary-gold/30"
+                      className={`absolute inset-0 rounded-full border-2 ${
+                        game.isGameRunning ? 'border-primary-gold/30' : 'border-gray-500/30'
+                      }`}
                       style={{
                         clipPath: game.timeRemaining > 0 
                           ? `polygon(0 0, 100% 0, 100% 100%, 0% 100%)`
                           : 'none',
-                        background: `conic-gradient(
+                        background: game.isGameRunning ? `conic-gradient(
                           transparent 0% ${100 - (game.timeRemaining / 30 * 100)}%,
                           rgba(255, 209, 102, 0.4) ${100 - (game.timeRemaining / 30 * 100)}% 100%
-                        )`
+                        )` : 'none'
                       }}
                     />
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-400">
+                  <div className={`text-xs ${
+                    game.isGameRunning ? 'text-gray-400' : 'text-gray-500'
+                  }`}>
                     {game.phase.charAt(0).toUpperCase() + game.phase.slice(1)}
+                    {!game.isGameRunning && ' (Paused)'}
                   </div>
                 </div>
               </div>
@@ -212,7 +286,8 @@ export default function GameLobby() {
       <SpinningWheelModal
         isOpen={showSpinModal}
         result={spinResult}
-        bettingResult={game.lastRoundResult}
+        bettingResult={game.wheelBettingResult}
+        isBackendSyncing={game.loading.backendSync}
         onClose={() => {
           setShowSpinModal(false)
           setSpinResult(null)
@@ -223,6 +298,17 @@ export default function GameLobby() {
           game.completeSpinResult()
         }}
       />
+      
+      {/* Loading overlay during backend sync */}
+      {game.loading.backendSync && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
+          <div className="bg-gray-800 rounded-xl p-6 text-center shadow-2xl">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-gold mx-auto mb-4"></div>
+            <h3 className="text-lg font-semibold text-white mb-2">Processing Bets</h3>
+            <p className="text-gray-400">Submitting to backend and calculating results...</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js'
+import { authService } from '../services/authService'
 
 interface AuthContextType {
   user: User | null
@@ -11,81 +12,142 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'mock-url'
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'mock-key'
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://tdisxnbzdpgzexbeopni.supabase.co'
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkaXN4bmJ6ZHBnemV4YmVvcG5pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY2NzcxMTUsImV4cCI6MjA3MjI1MzExNX0.MUODImjtrdw__9jw4F_Uw9mS3LyP587GZGmVl7kjRtE'
 
-// Mock client for development
-const createMockClient = () => ({
-  auth: {
-    signInWithPassword: async ({ email }: { email: string, password: string }) => ({
-      data: { user: { id: 'mock-user', email, user_metadata: { username: email.split('@')[0] } }, session: { access_token: 'mock-token' } },
-      error: null
-    }),
-    signUp: async ({ email, password, options }: any) => ({
-      data: { user: { id: 'mock-user', email, user_metadata: options?.data }, session: null },
-      error: null
-    }),
-    signOut: async () => ({ error: null }),
-    onAuthStateChange: (callback: any) => {
-      // Mock user session
-      setTimeout(() => {
-        callback('SIGNED_IN', { user: { id: 'mock-user', email: 'test@example.com', user_metadata: { username: 'testuser' } } })
-      }, 100)
-      return { data: { subscription: { unsubscribe: () => {} } } }
-    },
-    getSession: async () => ({
-      data: { session: { user: { id: 'mock-user', email: 'test@example.com', user_metadata: { username: 'testuser' } } } },
-      error: null
-    })
-  }
-})
-
-const supabase: SupabaseClient = supabaseUrl.includes('mock') 
-  ? createMockClient() as any
-  : createClient(supabaseUrl, supabaseKey)
+const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true
+    let initialized = false
+    
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (mounted && !initialized) {
+          initialized = true
+          setUser(session?.user ?? null)
+          if (session?.access_token) {
+            authService.setToken(session.access_token)
+          }
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error)
+        if (mounted && !initialized) {
+          initialized = true
+          setLoading(false)
+        }
+      }
+    }
+    
+    initializeAuth()
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (mounted) {
+        // Only update loading state if we're not in the middle of initialization
+        if (initialized || event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+          setUser(session?.user ?? null)
+          if (session?.access_token) {
+            authService.setToken(session.access_token)
+          } else {
+            authService.clearToken()
+          }
+          setLoading(false)
+        }
+      }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return { error: error.message }
-    return { error: undefined }
+    setLoading(true)
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setLoading(false)
+        return { error: error.message }
+      }
+      
+      // Store the JWT token for API calls
+      if (data.session?.access_token) {
+        authService.setToken(data.session.access_token)
+      }
+      
+      // Loading will be set to false by onAuthStateChange
+      return { error: undefined }
+    } catch (error) {
+      setLoading(false)
+      return { error: 'Sign in failed' }
+    }
   }
 
   const signUp = async (email: string, password: string, username: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { username }
+    setLoading(true)
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { username },
+          emailRedirectTo: undefined // Disable email confirmation
+        }
+      })
+      if (error) {
+        setLoading(false)
+        return { error: error.message }
       }
-    })
-    if (error) return { error: error.message }
-    return { error: undefined }
+      
+      // Store the JWT token for API calls
+      if (data.session?.access_token) {
+        authService.setToken(data.session.access_token)
+      }
+      
+      // Loading will be set to false by onAuthStateChange
+      return { error: undefined }
+    } catch (error) {
+      setLoading(false)
+      return { error: 'Sign up failed' }
+    }
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
-    // Ensure local state resets immediately (mock mode may not emit an event)
-    setUser(null)
+    setLoading(true)
+    try {
+      // Add timeout to prevent hanging
+      const signOutPromise = supabase.auth.signOut()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Logout timeout')), 5000)
+      )
+      
+      try {
+        await Promise.race([signOutPromise, timeoutPromise])
+      } catch (supabaseError) {
+        // Continue with local logout if Supabase fails
+        console.warn('Supabase signOut failed, proceeding with local logout')
+      }
+      
+      // Clear the stored token and local state
+      authService.clearToken()
+      setUser(null)
+      setLoading(false)
+    } catch (error) {
+      console.error('Error during sign out:', error)
+      // Force logout even if there's an error
+      authService.clearToken()
+      setUser(null)
+      setLoading(false)
+    }
   }
 
   const value = {

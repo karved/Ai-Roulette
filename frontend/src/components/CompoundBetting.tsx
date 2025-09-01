@@ -20,7 +20,7 @@ export default function CompoundBetting() {
     if (!validation.isValid || !compoundBetting.type || !game.player) return
 
     try {
-      await game.placeBet(compoundBetting.type, compoundBetting.selectedNumbers)
+      await game.placeBet(compoundBetting.type, compoundBetting.selectedNumbers, game.selectedChip)
       // Reset after successful bet
       game.setCompoundBettingMode(null)
     } catch (error) {

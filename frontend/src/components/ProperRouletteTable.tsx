@@ -18,7 +18,7 @@ export default function ProperRouletteTable() {
 
   const handleBetClick = (betType: string, numbers: number[]) => {
     if (game.phase !== 'betting') return
-    game.placeBet(betType, numbers)
+    game.placeBet(betType, numbers, game.selectedChip)
   }
 
   const handleNumberClick = (number: number) => {
@@ -216,9 +216,14 @@ export default function ProperRouletteTable() {
         {/* Start/Pause Button */}
         <div className="mt-3 flex justify-center">
           <button
-            onClick={game.spinWheel}
-            disabled={false}
-            className="bg-yellow-500 text-black py-2 px-6 rounded-lg font-bold text-sm hover:bg-yellow-400 transition-colors shadow-lg"
+            onClick={() => {
+              if (game.isGameRunning) {
+                game.pauseGame()
+              } else {
+                game.startGame()
+              }
+            }}
+            className="bg-yellow-500 text-black py-2 px-6 rounded-lg font-bold text-sm transition-colors shadow-lg"
           >
             {game.isGameRunning ? 'Pause' : 'Start'}
           </button>

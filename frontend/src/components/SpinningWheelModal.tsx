@@ -3,19 +3,20 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import rouletteWheelImg from "../assets/roulette-wheel.png";
 
-interface BettingResult {
-  totalWagered: number;
-  totalWon: number;
-  netResult: number;
-  participatedInRound: boolean;
-}
-
 interface SpinningWheelModalProps {
   isOpen: boolean;
   onClose: () => void;
   result: number | null;
   onSpinComplete: () => void;
-  bettingResult?: BettingResult | null;
+  bettingResult?: {
+    totalWagered: number;
+    totalWon: number;
+    netResult: number;
+    participatedInRound: boolean;
+    potentialWinnings?: number;
+    winningBetsWagered?: number;
+  } | null;
+  isBackendSyncing?: boolean;
 }
 
 const WHEEL_ORDER = [
@@ -23,7 +24,7 @@ const WHEEL_ORDER = [
   24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26
 ]; // Standard European roulette wheel order (clockwise from 0)
 
-export default function SpinningWheelModal({ isOpen, onClose, result: propResult, onSpinComplete, bettingResult }: SpinningWheelModalProps) {
+export default function SpinningWheelModal({ isOpen, onClose, result: propResult, onSpinComplete, bettingResult, isBackendSyncing = false }: SpinningWheelModalProps) {
   const [rotation, setRotation] = useState(0); // accumulated rotation degrees
   const [isSpinning, setIsSpinning] = useState(false);
   const [showResult, setShowResult] = useState(false);
@@ -50,7 +51,7 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
     };
 
     // Start a single run when isOpen flips true and no run is active
-    if (isOpen && !runActiveRef.current && propResult !== null) {
+    if (isOpen && !runActiveRef.current && propResult !== null && propResult !== 0) {
       runActiveRef.current = true;
       setShowResult(false);
       setResult(null);
@@ -108,7 +109,7 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, propResult]); // react to both isOpen and propResult changes
+  }, [isOpen, propResult]); // React to both isOpen and propResult changes
 
   if (!isOpen) return null;
 
@@ -141,6 +142,17 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
         </div>
 
         {isSpinning && <div className="text-white text-lg font-semibold mb-2">Spinning...</div>}
+        
+        {!isSpinning && !showResult && (
+          <div className="text-white text-lg font-semibold mb-2">Fetching random number...</div>
+        )}
+        
+        {isBackendSyncing && showResult && (
+          <div className="text-yellow-400 text-sm font-medium mb-2 flex items-center justify-center space-x-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-400"></div>
+            <span>Submitting & validating with backend...</span>
+          </div>
+        )}
 
         {showResult && result !== null && (
           <div className="text-center">
@@ -150,7 +162,7 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
               {result === 0 ? "Green" : (getNumberColor(result) === "text-red-400" ? "Red" : "Black")}
             </div>
             
-            {/* Betting Result Display */}
+            {/* Betting Result Display - Always show if there's betting data */}
             {bettingResult && (
               <div className="mt-4 p-3 bg-gray-700 rounded-lg">
                 {!bettingResult.participatedInRound ? (
@@ -159,14 +171,24 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    <div className="text-xs text-gray-400">Your Result</div>
+                    <div className="text-xs text-gray-400 flex items-center justify-between">
+                      <span>Your Result</span>
+                      {isBackendSyncing && (
+                        <span className="text-yellow-400 text-xs flex items-center space-x-1">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b border-yellow-400"></div>
+                          <span>Verifying...</span>
+                        </span>
+                      )}
+                    </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-300">Wagered:</span>
                       <span className="text-red-400">-${bettingResult.totalWagered.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-300">Won:</span>
-                      <span className="text-green-400">+${bettingResult.totalWon.toFixed(2)}</span>
+                      <span className="text-green-400">
+                        +${bettingResult.totalWon.toFixed(2)}
+                      </span>
                     </div>
                     <div className="border-t border-gray-600 pt-1 mt-2">
                       <div className="flex justify-between items-center font-semibold">
@@ -181,20 +203,30 @@ export default function SpinningWheelModal({ isOpen, onClose, result: propResult
               </div>
             )}
             
-            {/* Continue Button */}
+            {/* Continue Button - Shows loading during backend sync */}
             <button
               onClick={() => {
                 setShowResult(false);
+                setResult(null);
                 runActiveRef.current = false;
-                try {
-                  onClose();
-                } catch {
-                  // ignore errors from parent handler
-                }
+                // Call onClose which will trigger continueToNextRound and fresh state
+                onClose();
               }}
-              className="mt-4 bg-primary-gold hover:bg-yellow-400 text-black font-bold py-2 px-6 rounded-lg transition-colors shadow-lg"
+              disabled={isBackendSyncing}
+              className={`mt-4 font-bold py-2 px-6 rounded-lg transition-colors shadow-lg ${
+                isBackendSyncing 
+                  ? 'bg-gray-500 text-gray-300 cursor-not-allowed' 
+                  : 'bg-primary-gold hover:bg-yellow-400 text-black'
+              }`}
             >
-              Continue
+              {isBackendSyncing ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-300"></div>
+                  <span>Submitting & Validating...</span>
+                </div>
+              ) : (
+                'Continue'
+              )}
             </button>
           </div>
         )}
