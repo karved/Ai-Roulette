@@ -16,12 +16,13 @@ export default function ProperRouletteTable() {
     return redNumbers.includes(number) ? 'bg-red-600' : 'bg-black'
   }
 
-  const handleBetClick = (betType: string, numbers: number[]) => {
+  const handleBetClick = async (betType: string, numbers: number[]) => {
     if (game.phase !== 'betting') return
-    game.placeBet(betType, numbers, game.selectedChip)
+    // The placeBet method will handle insufficient balance notifications
+    await game.placeBet(betType, numbers, game.selectedChip)
   }
 
-  const handleNumberClick = (number: number) => {
+  const handleNumberClick = async (number: number) => {
     if (game.phase !== 'betting') return
     
     // If compound betting is active, handle number selection for compound bets
@@ -29,7 +30,7 @@ export default function ProperRouletteTable() {
       game.compoundBetting.onNumberSelect(number)
     } else {
       // Regular straight bet
-      handleBetClick('straight', [number])
+      await handleBetClick('straight', [number])
     }
   }
 

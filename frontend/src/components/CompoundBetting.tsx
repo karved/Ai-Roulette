@@ -19,6 +19,13 @@ export default function CompoundBetting() {
   const handlePlaceBet = async () => {
     if (!validation.isValid || !compoundBetting.type || !game.player) return
 
+    // Check for insufficient balance before attempting to place bet
+    if (!canAffordBet()) {
+      // The placeBet method will handle showing the notification
+      await game.placeBet(compoundBetting.type, compoundBetting.selectedNumbers, game.selectedChip)
+      return
+    }
+
     try {
       await game.placeBet(compoundBetting.type, compoundBetting.selectedNumbers, game.selectedChip)
       // Reset after successful bet
@@ -125,16 +132,15 @@ export default function CompoundBetting() {
       {/* Place Bet Button */}
       <button
         onClick={handlePlaceBet}
-        disabled={!validation.isValid || !canAffordBet() || game.phase !== 'betting'}
+        disabled={!validation.isValid || game.phase !== 'betting'}
         className={clsx(
           'w-full py-2 px-4 rounded-md font-medium transition-colors',
-          validation.isValid && canAffordBet() && game.phase === 'betting'
+          validation.isValid && game.phase === 'betting'
             ? 'bg-roulette-gold text-black hover:bg-yellow-500'
             : 'bg-gray-600 text-gray-400 cursor-not-allowed'
         )}
       >
-        {!canAffordBet() ? 'Insufficient Balance' : 
-         !validation.isValid ? 'Select Valid Numbers' :
+        {!validation.isValid ? 'Select Valid Numbers' :
          `Place ${compoundBetting.type?.toUpperCase()} Bet ($${game.selectedChip})`}
       </button>
 

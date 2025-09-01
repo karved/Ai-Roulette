@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, ReactNode } from 'react'
 import { create } from 'zustand'
 import { createClient } from '@supabase/supabase-js'
 import backendService from '../services/backendService'
+import NotificationSystem, { Notification } from '../components/NotificationSystem'
 
 // Types
 interface Player {
@@ -50,6 +51,12 @@ interface BettingResult {
 interface GameState {
   phase: 'betting' | 'spinning' | 'results'
   timeLeft: number
+  timeRemaining: number
+  currentRoundId: string
+  selectedChip: number
+  totalPot: number
+  isGameRunning: boolean
+  playerCount?: number
   player: Player | null
   activeBets: Bet[]
   recentSpins: SpinResult[]
@@ -67,6 +74,7 @@ interface GameState {
   initialRoundBalance: number
   frontendResult?: any
   backendSynced?: boolean
+  notifications: Notification[]
   compoundBetting: {
     isActive: boolean
     type: 'split' | 'street' | 'corner' | 'line' | null
@@ -97,6 +105,9 @@ interface GameStore extends GameState {
   selectCompoundNumber: (number: number) => void
   clearCompoundSelection: () => void
   setInitialRoundBalance: () => void // Set initial balance at start of round
+  // Notification methods
+  addNotification: (notification: Omit<Notification, 'id'>) => void
+  dismissNotification: (id: string) => void
   // Database methods
   loadGameState: () => Promise<void>
   // loadHotColdNumbers: () => Promise<void>
@@ -111,14 +122,13 @@ const useGameStore = create<GameStore>((set, get) => ({
   // Initial state - all empty until loaded from database
   currentRoundId: '',
   phase: 'betting',
+  timeLeft: 30,
   timeRemaining: 30,
   totalPot: 0,
+  selectedChip: 5,
+  isGameRunning: false,
   activeBets: [],
   recentSpins: [],
-  hotNumbers: [],
-  coldNumbers: [],
-  playerCount: 0,
-  selectedChip: 5,
   player: null,
   playerStats: {
     totalWon: 0,
@@ -127,9 +137,11 @@ const useGameStore = create<GameStore>((set, get) => ({
     winRate: 0
   },
   pendingResult: null,
-  isGameRunning: false, // Default to paused
   lastRoundResult: null,
+  wheelBettingResult: null,
   initialRoundBalance: 0, // Track initial balance at start of round
+  notifications: [],
+  error: null,
   compoundBetting: {
     isActive: false,
     type: null,
@@ -176,11 +188,11 @@ const useGameStore = create<GameStore>((set, get) => ({
         ...state.player,
         balance: state.player.balance + betToRemove.amount
       } : null,
-      playerStats: {
+      playerStats: state.playerStats ? {
         ...state.playerStats,
         totalWagered: state.playerStats.totalWagered - betToRemove.amount,
         totalBets: state.playerStats.totalBets - 1
-      }
+      } : null
     }))
     
     // 2. BACKEND SYNC: Only sync if bet was confirmed (not pending)
@@ -191,8 +203,19 @@ const useGameStore = create<GameStore>((set, get) => ({
   },
 
   placeBet: async (betType: string, numbers: number[], amount: number) => {
-    const { player, initialRoundBalance } = get()
-    if (!player || player.balance < amount) return
+    const { player, initialRoundBalance, addNotification } = get()
+    if (!player) return
+    
+    // Check for insufficient balance and show notification
+    if (player.balance < amount) {
+      addNotification({
+        type: 'error',
+        title: 'Insufficient Balance',
+        message: `You need $${amount} to place this bet, but you only have $${player.balance.toFixed(2)} available.`,
+        duration: 4000
+      })
+      return
+    }
     
     // Set initial balance BEFORE deducting bet amount (first bet of the round)
     if (initialRoundBalance === 0) {
@@ -227,11 +250,11 @@ const useGameStore = create<GameStore>((set, get) => ({
         isPending: true // Mark as pending backend confirmation
       }],
       totalPot: state.totalPot + amount,
-      playerStats: {
+      playerStats: state.playerStats ? {
         ...state.playerStats,
         totalWagered: state.playerStats.totalWagered + amount,
         totalBets: state.playerStats.totalBets + 1
-      }
+      } : null
     }))
     
     // No backend calls during betting phase - keep everything frontend only
@@ -467,7 +490,7 @@ const useGameStore = create<GameStore>((set, get) => ({
       const spinData = {
         balance: frontendResult?.initialBalance || get().initialRoundBalance || player?.balance || 0,
         winning_number: (frontendResult as any)?.animationWinningNumber, // Use animation number
-        bets: betsToSubmit.map(bet => ({
+        bets: betsToSubmit.map((bet: Bet) => ({
           betType: bet.betType,
           numbers: bet.numbers,
           amount: bet.amount
@@ -497,13 +520,13 @@ const useGameStore = create<GameStore>((set, get) => ({
             potentialWinnings: spinResponse.total_won,
             winningBetsWagered: spinResponse.total_won > 0 ? spinResponse.total_wagered : 0
           },
-          playerStats: {
+          playerStats: state.playerStats ? {
             ...state.playerStats,
             winRate: spinResponse.win_rate,
             totalWon: spinResponse.net_result + (state.playerStats.totalWon || 0),
             totalWagered: (state.playerStats.totalWagered || 0) + spinResponse.total_wagered,
             totalBets: (state.playerStats.totalBets || 0) + spinResponse.total_bets
-          },
+          } : null,
           backendSynced: true
         }))
         
@@ -604,6 +627,20 @@ const useGameStore = create<GameStore>((set, get) => ({
       selectedNumbers: []
     }
   })),
+
+  // Notification methods
+  addNotification: (notification: Omit<Notification, 'id'>) => {
+    const id = `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    set(state => ({
+      notifications: [...state.notifications, { ...notification, id }]
+    }))
+  },
+
+  dismissNotification: (id: string) => {
+    set(state => ({
+      notifications: state.notifications.filter(n => n.id !== id)
+    }))
+  },
 
   // Database methods
   loadGameState: async () => {
@@ -872,6 +909,7 @@ const GameContext = createContext<GameStore | null>(null)
 
 export function GameProvider({ children }: { children: ReactNode }) {
   const gameStore = useGameStore()
+  const { notifications, dismissNotification } = gameStore
   
   // Initialize backend connection and WebSocket
   useEffect(() => {
@@ -1017,6 +1055,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   return (
     <GameContext.Provider value={gameStore}>
       {children}
+      <NotificationSystem 
+        notifications={notifications} 
+        onDismiss={dismissNotification} 
+      />
     </GameContext.Provider>
   )
 }
