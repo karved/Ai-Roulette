@@ -121,16 +121,6 @@ export default function GameLobby() {
 
 
 
-              {/* Debug Spin Button */}
-              {game.phase === 'betting' && game.isGameRunning && (
-                <button
-                  onClick={() => game.spin()}
-                  className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
-                  title="Debug: Spin immediately"
-                >
-                  Spin Now
-                </button>
-              )}
 
               {/* Game Phase with Circular Timer */}
               <div className="flex items-center space-x-3">
